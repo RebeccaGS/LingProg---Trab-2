@@ -110,3 +110,5 @@ x_treinamento, x_teste, y_treinamento, y_teste = train_test_split( # Func train 
 # ---------------------------------------------------------------------------------------
 # 5 - Testes
 # ---------------------------------------------------------------------------------------
+
+# lembrem de comentar as partes do código pra ajudar entendimento e documentação <3

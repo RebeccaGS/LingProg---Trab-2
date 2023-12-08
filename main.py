@@ -20,9 +20,9 @@ from sklearn.linear_model import LogisticRegression
 # 2- leitura dos arquivos e separacao de colunas (loc/iloc)
 # ---------------------------------------------------------------------------------------
 
-dadosDeTreino = pd.read_csv('train.csv').iloc[:,:]
-dadosDeTeste = pd.read_csv('test.csv').iloc[:,:]
-respostasDeTeste =  pd.read_csv('gender_submission.csv').iloc[:,:]
+dadosDeTreino = pd.read_csv('dados/train.csv').iloc[:,:]
+dadosDeTeste = pd.read_csv('dados/test.csv').iloc[:,:]
+respostasDeTeste =  pd.read_csv('dados/gender_submission.csv').iloc[:,:]
 
 
 

@@ -1,114 +1,111 @@
-
 # ---------------------------------------------------------------------------------------
 # Trab 2 - LingProg - 23.2 - usar o aprendizado de máquina para criar um modelo que preveja quais
 # passageiros sobreviveram ao naufrágio do Titanic.
 # ---------------------------------------------------------------------------------------
 
 
-
 # ---------------------------------------------------------------------------------------
 # 1- Importações Iniciais
 # ---------------------------------------------------------------------------------------
-
 import pandas as pd
-import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier 
 
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-from sklearn.linear_model import LogisticRegression
+
 # ---------------------------------------------------------------------------------------
-# 2- leitura dos arquivos e separacao de colunas (loc/iloc)
+# 2- leitura dos arquivos para manipulação
 # ---------------------------------------------------------------------------------------
-
-dadosDeTreino = pd.read_csv('dados/train.csv').iloc[:,:]
-dadosDeTeste = pd.read_csv('dados/test.csv').iloc[:,:]
-respostasDeTeste =  pd.read_csv('dados/gender_submission.csv').iloc[:,:]
-
+# Carrega os dados de treino e de teste
+dadosDeTreino = pd.read_csv('dados/train.csv')
+dadosDeTeste = pd.read_csv('dados/test.csv')
 
 
 # ---------------------------------------------------------------------------------------
 # 3- Tratando os dados - Colunas: PassengerId,Survived,Pclass,Name,Sex,Age,SibSp,Parch,Ticket,Fare,Cabin,Embarked
 # Eliminar colunas não tão úteis, tratar dados vazios e separar colunas com mais de duas respostas em categorias
 # ---------------------------------------------------------------------------------------
+# Função para realizar o tratamento de idades vazias de acordo com o pronome utilizado
+def tratamento_de_idade(row):
+    if pd.isnull(row['Age']) and 'Mr.' in row['Name']:
+        return dadosDeTreino[dadosDeTreino['Name'].str.contains('Mr.')]['Age'].mean()
 
-# Iniciar tirando dados considerados não úteis
-dadosDescartaveis = (["SibSp","Ticket","Parch","Fare","Cabin","Embarked","Name"])   
-# descarte desses dados nas planilhas
-dadosDeTreino = dadosDeTreino.drop(dadosDescartaveis,axis=1) # axis = 1, eliminar coluna 
-dadosDeTeste = dadosDeTeste.drop(dadosDescartaveis,axis=1)
-
-
-# Preenchendo vazios, transformando em not a number:
-dadosDeTreino['Sex'] = np.where((dadosDeTreino.Sex == ' '),'N',dadosDeTreino.Sex)
-dadosDeTeste['Sex'] = np.where((dadosDeTeste.Sex == ' '),'N',dadosDeTeste.Sex)
-
-dadosDeTreino['Age'] = np.where((dadosDeTreino.Age == ' '),'XX',dadosDeTreino.Age)
-dadosDeTeste['Age'] = np.where((dadosDeTeste.Age == ' '),'XX',dadosDeTeste.Age)
-
-
-dadosDeTreino['Pclass'] = np.where((dadosDeTreino.Pclass == ' '),'XX',dadosDeTreino.Pclass)
-dadosDeTeste['Pclass'] = np.where((dadosDeTeste.Pclass == ' '),'XX',dadosDeTeste.Pclass)
-
-'''
-# retirada de not a numbers - os not a number não estão sendo substituidos
-
-dadosDeTreino['Age'] = dadosDeTreino['Age'].fillna(0)
-
-categoriasComNAN = ['Sex','Age','Pclass']
-
-for feature in categoriasComNAN:
-    dadosDeTreino[feature] = dadosDeTreino[feature].fillna(0)
-    dadosDeTeste[feature] = dadosDeTreino[feature].fillna(0)
-    print('uia')
+    elif pd.isnull(row['Age']) and 'Miss.' in row['Name']:
+        return dadosDeTreino[dadosDeTreino['Name'].str.contains('Miss.')]['Age'].mean()
     
-print('chegueiii')
-print(dadosDeTeste)
-print(dadosDeTreino)
+    elif pd.isnull(row['Age']) and 'Mrs.' in row['Name']:
+        return dadosDeTreino[dadosDeTreino['Name'].str.contains('Mrs.')]['Age'].mean()
+    
+    elif pd.isnull(row['Age']) and 'Dr.' in row['Name']:
+        return dadosDeTreino[dadosDeTreino['Name'].str.contains('Dr.')]['Age'].mean()
+    
+    elif pd.isnull(row['Age']) and 'Master.' in row['Name']:
+        return dadosDeTreino[dadosDeTreino['Name'].str.contains('Master.')]['Age'].mean()
 
+# Aplica a função de tratamento acima usando apply 
+dadosDeTreino['Age'] = dadosDeTreino.apply(lambda row: tratamento_de_idade(row), axis=1)
+dadosDeTeste['Age'] = dadosDeTreino.apply(lambda row: tratamento_de_idade(row), axis=1)
 
-for feature in categoriasComNAN:
-    dadosDeTreino[feature] = dadosDeTreino[feature].replace(np.nan,0)
-    dadosDeTeste[feature] = dadosDeTeste[feature].replace(np.nan,0)
-    print('CHEGUEI')
+# Tratamento de dados vazios em Sex - Tentamos aplicar um método similar ao da idade, porém a acurácia diminuiu ao inves de aumentar
+dadosDeTreino['Sex'] = dadosDeTreino['Sex'].replace('', 'N')
+dadosDeTeste['Sex'] = dadosDeTeste['Sex'].replace('', 'N')
 
-'''
+# Tratamento de dados vazios em Pclass
+dadosDeTreino['Pclass'] = dadosDeTreino['Pclass'].replace('', 'XX')
+dadosDeTeste['Pclass'] = dadosDeTeste['Pclass'].replace('', 'XX')
 
-# Diferenciando nossas variáveis Dummies (Variáveis dummy são variáveis binárias criadas 
-# para representar uma variável com duas ou mais categorias, sem hierarquia de relevância
+# Tratamento de dados vazios em Embarked
+dadosDeTreino['Embarked'] = dadosDeTreino['Embarked'].replace('', 'XX')
+dadosDeTeste['Embarked'] = dadosDeTeste['Embarked'].replace('', 'XX')
 
-colunasDummy = (['Sex',                            
-                 'Age',
-                 'Pclass'])
+# Eliminar colunas não tão úteis
+dadosDescartaveis = ["SibSp", "Ticket", "Parch", "Fare", "Name"]
+dadosDeTreino = dadosDeTreino.drop(dadosDescartaveis, axis=1)
+dadosDeTeste = dadosDeTeste.drop(dadosDescartaveis, axis=1)
 
-# Pegar Dummies
-dadosDeTreino = pd.get_dummies(dadosDeTreino, columns = colunasDummy)
-dadosDeTeste = pd.get_dummies(dadosDeTeste, columns = colunasDummy)
-
-print(dadosDeTeste)
-print(dadosDeTreino)
 
 # ---------------------------------------------------------------------------------------
 # 4 - Treinamento
 # ---------------------------------------------------------------------------------------
+# Seleciona as colunas importantes para previsão
+colunas_utilizadas = ['Sex', 'Age', 'Cabin', 'Embarked', 'Pclass']
 
-# y_treinamento: pega so coluna de Survived \\ x_treinamento: pega todas as colunas menos as de Survived
-y_treinamento = dadosDeTreino.loc[:,dadosDeTreino.columns == 'Survived'].values
-x_treinamento = dadosDeTreino.loc[:,dadosDeTreino.columns != 'Survived'].values
+# Usar get_dummies para codificar variáveis categóricas
+dadosDeTreino = pd.get_dummies(dadosDeTreino, columns=colunas_utilizadas, drop_first=True)
+dadosDeTeste = pd.get_dummies(dadosDeTeste, columns=colunas_utilizadas, drop_first=True)
 
+# Ajusta as colunas do conjunto de teste
+dadosDeTeste = dadosDeTeste.reindex(columns=dadosDeTreino.columns, fill_value=0)
 
-# No treinamento, separar uma parte dos dados que sabemos as respostas pra estudar o padrão, e outra
-# parte pra tentar prever e ver porcentagem de acerto
-x_treinamento, x_teste, y_treinamento, y_teste = train_test_split( # Func train test slip faz essa divisão
-    x_treinamento, 
-    y_treinamento.ravel(),
-    train_size =    0.5, # usar 50% para treino e 10% para teste
-)
+# Separa o conjunto de treinamento e teste
+y_treinamento = dadosDeTreino['Survived']
+x_treinamento = dadosDeTreino.drop('Survived', axis=1)
 
+# Normaliza os dados
+scaler = StandardScaler()
+x_treinamento_scaled = scaler.fit_transform(x_treinamento)
+x_predicao_scaled = scaler.transform(dadosDeTeste[x_treinamento.columns])
 
+# Treina e preve usando RandomForestClassifier
+modelo = RandomForestClassifier(n_estimators=100, random_state=42)
+modelo.fit(x_treinamento_scaled, y_treinamento)
+y_predicao = modelo.predict(x_predicao_scaled)
 
 
 # ---------------------------------------------------------------------------------------
-# 5 - Testes
+# 5 - Previsõa
 # ---------------------------------------------------------------------------------------
+# Realiza as predições nos dados de teste
+y_predicao = modelo.predict(x_predicao_scaled)
 
-# lembrem de comentar as partes do código pra ajudar entendimento e documentação <3
+# Cria o DataFrame com as colunas PassengerId e Survived assim como previsto na ementa do desafio
+dadosPrevistos = pd.DataFrame({
+    'PassengerId': dadosDeTeste['PassengerId'],
+    'Survived': y_predicao
+})
+
+# Salva as predições em um arquivo CSV dentro da pasta de dados/
+dadosPrevistos.to_csv('dados/predicoes.csv', index=False)
+
+#Printa dados não necessários pelo desafio, porém interessantes para análise
+print("Sobrevivencia: " + str(round(100*(dadosPrevistos['Survived'].sum()/dadosPrevistos['Survived'].count()))) + "%")
+print("Quantidade total de passageiros: " + str(dadosPrevistos['Survived'].count()))

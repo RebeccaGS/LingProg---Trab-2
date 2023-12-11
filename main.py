@@ -10,7 +10,8 @@
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier 
-from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+import random
 
 
 # ---------------------------------------------------------------------------------------
@@ -26,8 +27,9 @@ dadosDeTeste = pd.read_csv('dados/test.csv')
 # Eliminar colunas não tão úteis, tratar dados vazios e separar colunas com mais de duas respostas em categorias
 # ---------------------------------------------------------------------------------------
 # Os outros dados não precisam de tratamento pois não possuem dados vazios, como obervado no código abaixo
-# print("dados de treino: \n"+str(dadosDeTreino.isnull().sum())+"\n") #deixamos comentadopois so foi usado para fins de consulta esporádicas 
+# print("dados de treino: \n"+str(dadosDeTreino.isnull().sum())+"\n") #deixamos comentado pois so foi usado para fins de consulta esporádicas 
 # print("dados de teste: \n"+str(dadosDeTeste.isnull().sum()))
+# print("\n"+str(dadosDeTreino['Fare'].unique)+"\n")
 
 # Função para realizar o tratamento de idades vazias de acordo com o pronome utilizado
 def tratamento_de_idade(row):
@@ -61,7 +63,7 @@ dadosDeTeste.loc[dadosDeTeste['Sex'] == 'male', ['Sex']] = 0
 dadosDeTeste.loc[dadosDeTeste['Sex'] == 'female', ['Sex']] = 1
 
 # Elimina colunas não tão úteis
-dadosDescartaveis = ["Name", "Embarked"]
+dadosDescartaveis = ["Name", "Embarked", "Ticket"]
 dadosDeTreino = dadosDeTreino.drop(dadosDescartaveis, axis=1)
 dadosDeTeste = dadosDeTeste.drop(dadosDescartaveis, axis=1)
 
@@ -70,7 +72,7 @@ dadosDeTeste = dadosDeTeste.drop(dadosDescartaveis, axis=1)
 # 4 - Treinamento
 # ---------------------------------------------------------------------------------------
 # Seleciona as colunas importantes para previsão
-colunas_utilizadas = ['Sex', 'Age', 'Cabin', 'Pclass', "SibSp", "Ticket", "Parch", "Fare"]
+colunas_utilizadas = ['Sex', 'Age', 'Cabin', 'Pclass', "SibSp", "Parch", "Fare"]
 
 # Usar get_dummies para codificar variáveis categóricas
 dadosDeTreino = pd.get_dummies(dadosDeTreino, columns=colunas_utilizadas, drop_first=True)
@@ -88,30 +90,41 @@ scaler = StandardScaler()
 x_treinamento_scaled = scaler.fit_transform(x_treinamento)
 x_predicao_scaled = scaler.transform(dadosDeTeste[x_treinamento.columns])
 
-# Treina e preve usando RandomForestClassifier - os parâmetros foram testados e avaliados de acorod com a acurácia abaixo
-modelo = RandomForestClassifier(n_estimators=10000, max_depth=10, min_samples_split=2, min_samples_leaf=1, random_state=1)
-modelo.fit(x_treinamento_scaled, y_treinamento)
-
 
 # ---------------------------------------------------------------------------------------
 # 5 - Previsõa
 # ---------------------------------------------------------------------------------------
-# Realiza as predições nos dados de teste
-y_predicao = modelo.predict(x_predicao_scaled)
+# Número de execuções para realizar a previsão
+numero_de_execucoes = 2
 
-# Calcular a acurácia nos dados de treinamento
-acuracia_treinamento = modelo.score(x_treinamento_scaled, y_treinamento)
+# Inicializa um DataFrame vazio para armazenar a soma
+dadosPrevistos = None
+# Alógica do for abaixo serve para garantir a estabilidade da previsão e tentar melhorá-la por conseuqnete 
+for i in range(numero_de_execucoes):
+    # Usa o RandomForestClassifier para realizar o treinamento
+    modelo = RandomForestClassifier(n_estimators=1000, max_depth=10, min_samples_split=2, min_samples_leaf=1, random_state= random.randint(1, max(1, i * numero_de_execucoes)))
+    modelo.fit(x_treinamento_scaled, y_treinamento)
 
-# Cria o DataFrame com as colunas PassengerId e Survived assim como previsto na ementa do desafio
-dadosPrevistos = pd.DataFrame({
-    'PassengerId': dadosDeTeste['PassengerId'],
-    'Survived': y_predicao
-})
+    # Realiza as predições nos dados de teste
+    predicao = modelo.predict(x_predicao_scaled)
 
-# Salva as predições em um arquivo CSV dentro da pasta de dados/
+    # Adiciona as predições ao DataFrame de previsão
+    if dadosPrevistos is None:
+        dadosPrevistos = pd.DataFrame({
+            'PassengerId': dadosDeTeste['PassengerId'],
+            'Survived': predicao
+        })
+    else:
+        dadosPrevistos['Survived'] += predicao
+
+# Divide as predições pela quantidade de execuções e arredonda para o inteiro mais próximo - garantindo assim estar em binário
+dadosPrevistos['Survived'] = round(dadosPrevistos['Survived'] / numero_de_execucoes).astype(int)
+
+# Salva o resultado da soma em um novo arquivo .CSV
 dadosPrevistos.to_csv('dados/predicoes.csv', index=False)
 
 #Printa dados não necessários pelo desafio, porém interessantes para análise
 print("Sobrevivencia: " + str(round(100*(dadosPrevistos['Survived'].sum()/dadosPrevistos['Survived'].count()))) + "%")
 print("Quantidade total de passageiros: " + str(dadosPrevistos['Survived'].count()))
-print("Acuracia: " + str(round(acuracia_treinamento*100, 2)) + "%")
+print("Quantidade de sobreviventes: " + str(dadosPrevistos['Survived'].sum()))
+print("Quantidade de mortos: " + str(dadosPrevistos['Survived'].count()-dadosPrevistos['Survived'].sum()))

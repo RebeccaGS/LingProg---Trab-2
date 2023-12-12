@@ -67,10 +67,6 @@ dadosDescartaveis = ["Name", "Embarked", "Ticket"]
 dadosDeTreino = dadosDeTreino.drop(dadosDescartaveis, axis=1)
 dadosDeTeste = dadosDeTeste.drop(dadosDescartaveis, axis=1)
 
-
-# ---------------------------------------------------------------------------------------
-# 4 - Treinamento
-# ---------------------------------------------------------------------------------------
 # Seleciona as colunas importantes para previsão
 colunas_utilizadas = ['Sex', 'Age', 'Cabin', 'Pclass', "SibSp", "Parch", "Fare"]
 
@@ -80,6 +76,11 @@ dadosDeTeste = pd.get_dummies(dadosDeTeste, columns=colunas_utilizadas, drop_fir
 
 # Ajusta as colunas do conjunto de teste
 dadosDeTeste = dadosDeTeste.reindex(columns=dadosDeTreino.columns, fill_value=0)
+
+
+# ---------------------------------------------------------------------------------------
+# 4 - Treinamento
+# ---------------------------------------------------------------------------------------
 
 # Separa o conjunto de treinamento e teste
 y_treinamento = dadosDeTreino['Survived']
